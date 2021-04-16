@@ -13,6 +13,7 @@ var Fx = require('../../components/fx');
 var Registry = require('../../registry');
 var getTraceColor = require('./get_trace_color');
 var Color = require('../../components/color');
+var lodash = require('lodash');
 var fillText = Lib.fillText;
 
 module.exports = function hoverPoints(pointData, xval, yval, hovermode) {
@@ -61,45 +62,56 @@ module.exports = function hoverPoints(pointData, xval, yval, hovermode) {
 
         // skip the rest (for this trace) if we didn't find a close point
         if(pointData.index !== false) {
-            // the closest data point
-            var di = cd[pointData.index];
-            var xc = xa.c2p(di.x, true);
-            var yc = ya.c2p(di.y, true);
-            var rad = di.mrc || 1;
+            let targetX = cd[pointData.index].x;
+            var res = [];
 
-            // now we're done using the whole `calcdata` array, replace the
-            // index with the original index (in case of inserted point from
-            // stacked area)
-            pointData.index = di.i;
-
-            var orientation = cd[0].t.orientation;
-            // TODO: for scatter and bar, option to show (sub)totals and
-            // raw data? Currently stacked and/or normalized bars just show
-            // the normalized individual sizes, so that's what I'm doing here
-            // for now.
-            var sizeVal = orientation && (di.sNorm || di.s);
-            var xLabelVal = (orientation === 'h') ? sizeVal : di.orig_x !== undefined ? di.orig_x : di.x;
-            var yLabelVal = (orientation === 'v') ? sizeVal : di.orig_y !== undefined ? di.orig_y : di.y;
-
-            Lib.extendFlat(pointData, {
-                color: getTraceColor(trace, di),
-
-                x0: xc - rad,
-                x1: xc + rad,
-                xLabelVal: xLabelVal,
-
-                y0: yc - rad,
-                y1: yc + rad,
-                yLabelVal: yLabelVal,
-
-                spikeDistance: dxy(di),
-                hovertemplate: trace.hovertemplate
-            });
-
-            fillText(di, trace, pointData);
-            Registry.getComponentMethod('errorbars', 'hoverInfo')(di, trace, pointData);
-
-            return [pointData];
+            for (let idx = 0; idx < cd.length; idx++) {
+                if (cd[idx].x !== targetX) {
+                    continue;
+                }
+                var _pointData = lodash.cloneDeep(pointData);
+                _pointData.index = idx;
+                // the closest data point
+                var di = cd[_pointData.index];
+                var xc = xa.c2p(di.x, true);
+                var yc = ya.c2p(di.y, true);
+                var rad = di.mrc || 1;
+                
+                // now we're done using the whole `calcdata` array, replace the
+                // index with the original index (in case of inserted point from
+                // stacked area)
+                _pointData.index = di.i;
+                
+                var orientation = cd[0].t.orientation;
+                // TODO: for scatter and bar, option to show (sub)totals and
+                // raw data? Currently stacked and/or normalized bars just show
+                // the normalized individual sizes, so that's what I'm doing here
+                // for now.
+                var sizeVal = orientation && (di.sNorm || di.s);
+                var xLabelVal = (orientation === 'h') ? sizeVal : di.orig_x !== undefined ? di.orig_x : di.x;
+                var yLabelVal = (orientation === 'v') ? sizeVal : di.orig_y !== undefined ? di.orig_y : di.y;
+                
+                
+                Lib.extendDeepNoArrays(_pointData, {
+                    color: getTraceColor(trace, di),
+                    
+                    x0: xc - rad,
+                    x1: xc + rad,
+                    xLabelVal: xLabelVal,
+                    
+                    y0: yc - rad,
+                    y1: yc + rad,
+                    yLabelVal: yLabelVal,
+                    
+                    spikeDistance: dxy(di),
+                    hovertemplate: trace.hovertemplate
+                });
+                
+                fillText(di, trace, _pointData);
+                Registry.getComponentMethod('errorbars', 'hoverInfo')(di, trace, _pointData);
+                res.push(_pointData);
+            }
+            return res;
         }
     }
 
